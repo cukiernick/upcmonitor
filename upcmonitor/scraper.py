@@ -4,7 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 from influxdb import InfluxDBClient
 
-import schemas
+from upcmonitor import schemas
 
 
 def scrap_downstream(html_down: str) -> List[schemas.ChannelDataDown]:

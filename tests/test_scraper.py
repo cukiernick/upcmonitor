@@ -1,8 +1,8 @@
 import pathlib
 import unittest
 
-from scrapper import (ChannelDataDown, ChannelDataUp, scrap_downstream,
-                      scrap_upstream)
+from upcmonitor.schemas import ChannelDataDown, ChannelDataUp
+from upcmonitor.scraper import scrap_downstream, scrap_upstream
 
 
 def get_html_content(filename: str) -> str:
