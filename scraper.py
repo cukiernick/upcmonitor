@@ -1,9 +1,10 @@
 from typing import List
-import datetime
+
 import requests
-import schemas
 from bs4 import BeautifulSoup
 from influxdb import InfluxDBClient
+
+import schemas
 
 
 def scrap_downstream(html_down: str) -> List[schemas.ChannelDataDown]:
@@ -36,7 +37,7 @@ def scrap_downstream(html_down: str) -> List[schemas.ChannelDataDown]:
         rate = tds[5]
         symbol_raw = rate.find("script").text
         symbol_raw = symbol_raw.lstrip('i18n("').rstrip('")')
-        
+
         snr = tds[6].text
 
         power = tds[7].text
@@ -111,39 +112,37 @@ def check_if_on_loginpage(url_check: str) -> bool:
     url_check_response = requests.get(url_check, timeout=10)
     loginpage = BeautifulSoup(url_check_response.text, "lxml")
     check_loginpage = loginpage.find("h2")
-    if (
-        str(check_loginpage) == loginpage_str_to_compare
-    ):
+    if str(check_loginpage) == loginpage_str_to_compare:
         return True
     else:
         return False
 
 
 def login_into() -> None:
-    print('Trying to login...')
-    url_login = 'http://192.168.42.1/goform/login'
-    s = requests.get('http://192.168.42.1/login.asp')
+    print("Trying to login...")
+    url_login = "http://192.168.42.1/goform/login"
+    s = requests.get("http://192.168.42.1/login.asp")
     st = s.text
     stx = BeautifulSoup(st, "lxml")
     csrf = str(stx.find("input"))
     csrf = csrf.lstrip('<input name="CSRFValueL" type="hidden" value=').rstrip('"/>')
     print(f"CSRFValue={csrf}")
     login_payload = {
-        'CSRFValue': f'{csrf}',
-        'loginUsername': 'admin',
-        'loginPassword': 'admin',
-        'logoffUser': '0',
+        "CSRFValue": f"{csrf}",
+        "loginUsername": "admin",
+        "loginPassword": "admin",
+        "logoffUser": "0",
     }
     headers = {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate',
-        'Origin': 'http://192.168.42.1',
-        'Connection': 'keep-alive',
-        'Referer': 'http://192.168.42.1/',
-        'Upgrade-Insecure-Requests': '1',
-        'DNT': '1',
-        'Sec-GPC': '1',
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate",
+        "Origin": "http://192.168.42.1",
+        "Connection": "keep-alive",
+        "Referer": "http://192.168.42.1/",
+        "Upgrade-Insecure-Requests": "1",
+        "DNT": "1",
+        "Sec-GPC": "1",
     }
     logged_url = requests.post(url_login, data=login_payload, headers=headers)
     try:
@@ -158,7 +157,7 @@ def request_downstream() -> str:
     url_downstream = "http://192.168.42.1/status/connection-downstream.asp"
     print("Requesting data from downstream.asp...")
     if check_if_on_loginpage(url_downstream) is True:
-        print('Not logged in')
+        print("Not logged in")
         login_into()
     try:
         response_down = requests.get(url_downstream, timeout=10)
@@ -176,7 +175,7 @@ def request_upstream() -> str:
     url_upstream = "http://192.168.42.1/status/connection-upstream.asp"
     print("Requesting data from upstream.asp...")
     if check_if_on_loginpage(url_upstream) is True:
-        print('Not logged in')
+        print("Not logged in")
         login_into()
     try:
         response_up = requests.get(url_upstream, timeout=10)
@@ -189,7 +188,10 @@ def request_upstream() -> str:
         print("Whooops something else:", err)
     return response_up.text
 
-def influx_write(ups: List[schemas.ChannelDataUp], downs: List[schemas.ChannelDataDown]):
+
+def influx_write(
+    ups: List[schemas.ChannelDataUp], downs: List[schemas.ChannelDataDown]
+):
     points = list()
     for ch in ups:
         points.append(
@@ -228,7 +230,7 @@ def influx_write(ups: List[schemas.ChannelDataUp], downs: List[schemas.ChannelDa
             )
         )
 
-    client = InfluxDBClient(host='localhost', port=8086)
+    client = InfluxDBClient(host="localhost", port=8086)
     client.write_points(points=points, database="electric")
     client.close()
 
