@@ -2,9 +2,8 @@ from typing import List
 import datetime
 import requests
 import schemas
-import database
-import crud
 from bs4 import BeautifulSoup
+from influxdb import InfluxDBClient
 
 
 def scrap_downstream(html_down: str) -> List[schemas.ChannelDataDown]:
@@ -31,11 +30,13 @@ def scrap_downstream(html_down: str) -> List[schemas.ChannelDataDown]:
         modulation = tds[4]
         modulation_raw = modulation.find("script").text
         modulation_raw = modulation_raw.lstrip('i18n("').rstrip('")')
+        if modulation_raw == "TAG_UPC_T37":
+            modulation_raw = "N/A"
 
         rate = tds[5]
         symbol_raw = rate.find("script").text
         symbol_raw = symbol_raw.lstrip('i18n("').rstrip('")')
-
+        
         snr = tds[6].text
 
         power = tds[7].text
@@ -188,28 +189,53 @@ def request_upstream() -> str:
         print("Whooops something else:", err)
     return response_up.text
 
+def influx_write(ups: List[schemas.ChannelDataUp], downs: List[schemas.ChannelDataDown]):
+    points = list()
+    for ch in ups:
+        points.append(
+            dict(
+                measurement="channelDataUp",
+                tags={
+                    "transmitter_id": ch.transmitter_id,
+                    "channel_id": ch.channel_id,
+                    "lock_status": ch.lock_status,
+                    "frequency": ch.frequency,
+                    "modulation": ch.modulation,
+                    "channel_type": ch.channel_type,
+                },
+                fields={
+                    "symbol_rate": ch.symbol_rate,
+                    "power": ch.power,
+                },
+            )
+        )
+    for ch in downs:
+        points.append(
+            dict(
+                measurement="channelDataDown",
+                tags={
+                    "receiver_id": ch.receiver_id,
+                    "channel_id": ch.channel_id,
+                    "lock_status": ch.lock_status,
+                    "frequency": ch.frequency,
+                    "modulation": ch.modulation,
+                },
+                fields={
+                    "symbol_rate": ch.symbol_rate,
+                    "snr": ch.snr,
+                    "power": ch.power,
+                },
+            )
+        )
 
-def create_entry() -> schemas.EntryData:
-    entry_datetime = datetime.datetime.now(datetime.timezone.utc)
-    return schemas.EntryData(id=1, timestamp=entry_datetime)
-
-
-# Create and commit EntryData and ChannelDataUp/Down with relation by entry.id
-def transaction_full(downstream: List[schemas.ChannelDataDown], upstream: List[schemas.ChannelDataUp]):
-    new_entry = create_entry()
-    with database.SessionLocal.begin():
-        last_entry = crud.create_entrydata(database.sessionlocal, new_entry)
-        for row_down in downstream:
-            crud.create_downstreamdata(database.sessionlocal, row_down, last_entry.id)
-        for row_up in upstream:
-            crud.create_upstreamdata(database.sessionlocal, row_up, last_entry.id)
+    client = InfluxDBClient(host='localhost', port=8086)
+    client.write_points(points=points, database="electric")
+    client.close()
 
 
 if __name__ == "__main__":
-    database.create_tables()
     resp_up = request_upstream()
     up = scrap_upstream(resp_up)
     resp_down = request_downstream()
     down = scrap_downstream(resp_down)
-    database.create_tables()
-    transaction_full(down, up)
+    influx_write(ups=up, downs=down)

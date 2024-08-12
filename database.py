@@ -2,7 +2,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from models import Base
 
-SQLALCHEMY_DATABASE_URL = "postgresql+psycopg2://upcmonitor:upcmonitor123@192.168.43.5:5432/upc"
+SQLALCHEMY_DATABASE_URL = "postgresql+psycopg2://upcmonitor:upcmonitor123@localhost:5432/upc"
 schema_name = 'upclive'
 
 engine = create_engine(
